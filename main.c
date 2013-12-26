@@ -1,6 +1,6 @@
 // include <msp430.h>
 #include <msp430fr5739.h>
-#include <signal.h>
+//include <signal.h>
 
 #define I2CP (BIT6|BIT7)
 #define PADA_M (~I2CP)
@@ -10,13 +10,13 @@
 #define NC_ 0xCB00
 #define NC ((unsigned int volatile *)NC_)
 
-#define LC_ 0xCB00
+#define LC_ 0xCB10
 #define LC ((unsigned int volatile *)LC_)
 
-#define I2NCH_ 0xCB02
+#define I2NCH_ 0xCB20
 #define I2NCH ((unsigned char volatile *)I2NCH_)
 
-#define RLOG_ 0xCA10
+#define RLOG_ 0xCB80
 #define RLOG ((unsigned long volatile *)(RLOG_))
 
 #define MC 0
@@ -26,13 +26,13 @@
 #define WK 8
 
 
-#define LOG_ 0xCB10
+#define LOG_ 0xCC00
 #define LOG ((unsigned long volatile *)(LOG_))
 // 4kb/1kc log for testing
 #define LOG_MAX 1024
 
 // FLAGS
-#define FLGS_ 0xCA00
+#define FLGS_ 0xCBF0
 #define FLGS ((unsigned int volatile *)FLGS_)
 #define CHREADY 1
 #define STRT 2
@@ -43,6 +43,9 @@ void slp() {
 	if (PAIN & BIT7) {
 		PAIES |= BIT6; // high -> low;
 		PAIE |= BIT6;
+	}
+	if (PAIN & BIT0) { // block sleep for a reset
+		return;
 	}
 
        __disable_interrupt();
@@ -92,12 +95,12 @@ void setp() {
   }
 
 
-  if ((*NC > LOG_MAX) || (LOG[*NC] != 0)) {
+  if ((*NC >= LOG_MAX) || (LOG[*NC] != 0)) {
   	*NC = (*NC+1) % LOG_MAX;
    	LOG[*NC] = 0;
   }
-  if ((*LC > LOG_MAX) || (LOG[*LC] == 0)) {
-	*LC = (*NC-1+ LOG_MAX)%LOG_MAX;
+  if ((*LC >= LOG_MAX) || (*LC == *NC)) {
+	*LC = *NC ? *NC-1:LOG_MAX-1;
 	*I2NCH = 0;
   }
 
@@ -205,10 +208,15 @@ static inline int keyEvent()
   return 0;
 }
 
-interrupt(PORT1_VECTOR) p1() {
+#pragma vector=PORT1_VECTOR
+#pragma vector=PORT2_VECTOR
+#pragma vector=PORT3_VECTOR
+#pragma vector=PORT4_VECTOR
+__interrupt void pins() {
   if (keyEvent())
     __bic_SR_register_on_exit(LPM4_bits);
 }
+/*
 interrupt(PORT2_VECTOR) p2() {
   if (keyEvent())
     __bic_SR_register_on_exit(LPM4_bits);
@@ -221,8 +229,10 @@ interrupt(PORT4_VECTOR) p4() {
   if (keyEvent())
     __bic_SR_register_on_exit(LPM4_bits);
 }
+*/
 
-interrupt(USCI_B0_VECTOR) i2c() {
+#pragma vector=USCI_B0_VECTOR
+__interrupt void i2c() {
    //switch(__even_in_range(UCB0IV,0x1E)) {
    switch (UCB0IV&0x1E) {
 	case USCI_I2C_UCNACKIFG:
