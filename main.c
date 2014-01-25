@@ -2,42 +2,51 @@
 #include <msp430fr5739.h>
 //include <signal.h>
 
+
+struct StenoStats {
+	unsigned long volatile mc; // main entrances
+	unsigned long volatile rchrd; // raw chord(s) overlayed
+	unsigned long volatile ic; // interrupt entrances
+	unsigned long volatile rc; // reconfigure entrances
+	unsigned long volatile wk; // bad wakeup
+};
+
+// 4kb/1kc log for testing
+#define LOG_MAX 1024
+
+struct StenoLog {
+	unsigned int nc; // next chord location
+	unsigned int lc; // last sent chord
+	unsigned char i2nch; // last sent sub byte
+	unsigned char flags; // log status
+	unsigned char active_flags; // signs of life
+	unsigned char resrv;
+	unsigned int volatile log[LOG_MAX]; // bulk log
+};
+
+struct AsyncTask {
+	unsigned long pins;
+	void (*setup)();
+	void (*onFlagsWake)();
+	void (*interrupt)();
+	void *ivectors;
+	unsigned char flags;
+};
+
 #define I2CP (BIT6|BIT7)
 #define PADA_M (~I2CP)
 // define PADA_M (~0x0)
 #define PADB_M ~(BITF|BITE|BITD|BITC|BITB|BITA)
 
-#define NC_ 0xCB00
-#define NC ((unsigned int volatile *)NC_)
-
-#define LC_ 0xCB10
-#define LC ((unsigned int volatile *)LC_)
-
-#define I2NCH_ 0xCB20
-#define I2NCH ((unsigned char volatile *)I2NCH_)
-
-#define RLOG_ 0xCB80
-#define RLOG ((unsigned long volatile *)(RLOG_))
-
-#define MC 0
-#define RCHRD 2
-#define IC 4
-#define RC 6
-#define WK 8
-
-
-#define LOG_ 0xCC00
-#define LOG ((unsigned long volatile *)(LOG_))
-// 4kb/1kc log for testing
-#define LOG_MAX 1024
 
 // FLAGS
-#define FLGS_ 0xCBF0
-#define FLGS ((unsigned int volatile *)FLGS_)
 #define CHREADY 1
 #define STRT 2
 #define R2NOTIFY 4
 #define I2CCSEND 8
+
+volatile struct StenoStats *st = (volatile struct StenoStats *)0xcb00;
+volatile struct StenoLog *s = (volatile struct StenoLog *)0xcc00;
 
 void slp() {
 	if (PAIN & BIT7) {
@@ -95,42 +104,40 @@ void setp() {
   }
 
 
-  if ((*NC >= LOG_MAX) || (LOG[*NC] != 0)) {
-  	*NC = (*NC+1) % LOG_MAX;
-   	LOG[*NC] = 0;
+  if ((s->nc >= LOG_MAX) || (s->log[s->nc] != 0)) {
+  	s->nc = (s->nc+1) % LOG_MAX;
+   	s->log[s->nc] = 0;
   }
-  if ((*LC >= LOG_MAX) || (*LC == *NC)) {
-	*LC = *NC ? *NC-1:LOG_MAX-1;
-	*I2NCH = 0;
+  if ((s->lc >= LOG_MAX) || (s->lc == s->nc)) {
+	s->lc = s->nc ? s->nc-1:LOG_MAX-1;
+	s->i2nch = 0;
   }
 
-   RLOG[MC] = 1;
-   RLOG[RC] += 1;
-   RLOG[WK] = 0xafdeafde;
+   st->mc = 1;
+   st->rc += 1;
+   st->wk = 0xafdeafde;
 }
 
 void lp () {
-  unsigned long volatile *p;
    while(1) {
 
-    if (!(*FLGS & (CHREADY|R2NOTIFY))) {
+    if (!(s->flags & (CHREADY|R2NOTIFY))) {
 	slp();
-   	RLOG[WK] = 0xedfecefa;
+   	st->wk = 0xedfecefa;
     }
 
     __delay_cycles(20000); // 20 MS?
-    if (*FLGS & R2NOTIFY) {
-	*FLGS &= ~R2NOTIFY;
+    if (s->flags & R2NOTIFY) {
+	s->flags &= ~R2NOTIFY;
 	PJOUT &= ~BIT0;
     }
 
-    if (*FLGS & CHREADY) {
-        *FLGS &= ~CHREADY;
-   	*NC = (*NC+1) % LOG_MAX;
-   	p = &LOG[*NC];
-   	*p = 0;
+    if (s->flags & CHREADY) {
+        s->flags &= ~CHREADY;
+   	s->nc = (s->nc+1) % LOG_MAX;
+   	s->log[s->nc] = 0;
 	PJOUT |= BIT0;
-        *FLGS |= R2NOTIFY;
+        s->flags |= R2NOTIFY;
     }
    }
 
@@ -150,10 +157,10 @@ int main(void) {
     CSCTL0_H = 0x01;
 
 
-  if ((*FLGS & CHREADY) == 0)
+  if ((s->flags & CHREADY) == 0)
 	setp();
   __enable_interrupt();
-  RLOG[MC] += 1;
+  st->mc += 1;
   lp();
   return 1;
 }
@@ -167,7 +174,6 @@ pragma vector=PORT4_VECTOR
 static inline int keyEvent()
 {
 
-  unsigned long volatile *p;
   unsigned long volatile upd = 0;
 
   if (PAIFG & BIT7) { // i2c is active
@@ -183,7 +189,7 @@ static inline int keyEvent()
   if (!(PAIFG & PADA_M || PBIFG & PADB_M))
 	return 0;
 
-  RLOG[IC]+=1;
+  st->ic +=1;
 
   PAIES = (PADA_M & PAIN) | (PAIES & ~PADA_M);
   PBIES = (PADB_M & PBIN) | (PBIES & ~PADB_M);
@@ -194,16 +200,16 @@ static inline int keyEvent()
   upd = (PAIN & PADA_M);
   upd = upd<<16;
   upd |= (PBIN & PADB_M);
-  RLOG[RCHRD] |= upd;
+  st->rchrd |= upd;
 
-  p = &LOG[*NC];
-  if (upd == 0 && *p != 0) {
-    *FLGS |= CHREADY;
+  if (upd == 0 && s->log[s->nc] != 0) {
+    s->nc += 1;
+    s->flags |= CHREADY;
     return 1;
   }
 
-  *p |= upd;
-  *FLGS &= ~CHREADY;
+  s->log[s->nc] |= upd;
+  s->flags &= ~CHREADY;
  
   return 0;
 }
@@ -236,19 +242,19 @@ __interrupt void i2c() {
    //switch(__even_in_range(UCB0IV,0x1E)) {
    switch (UCB0IV&0x1E) {
 	case USCI_I2C_UCNACKIFG:
-		*I2NCH+=5;
+		s->i2nch+=5;
 		/* Fall through */
 	case USCI_I2C_UCTXIFG0:
              UCB0IFG &= ~UCTXIFG;
-	     if (*FLGS & I2CCSEND) {
-		*I2NCH+=1;
-		if (*I2NCH > 3) {
-			*LC = (*LC+1) % LOG_MAX;
-			*I2NCH = 0;
-			*FLGS ^= I2CCSEND;
+	     if (s->flags & I2CCSEND) {
+		s->i2nch+=1;
+		if (s->i2nch > 3) {
+			s->lc = (s->lc+1) % LOG_MAX;
+			s->i2nch = 0;
+			s->flags ^= I2CCSEND;
 			UCB0CTLW0 |= UCTXSTP;           // I2C stop condition
 		} else {
-			UCB0TXBUF = (unsigned char) (LOG[*LC] >> (*I2NCH * 8));
+			UCB0TXBUF = (unsigned char) (s->log[s->lc] >> (s->i2nch * 8));
 		}
 	     } else {
 		UCB0CTLW0 |= UCTXSTP;           // I2C stop condition
@@ -256,10 +262,10 @@ __interrupt void i2c() {
 	     break;
 	case USCI_I2C_UCRXIFG0:
             	UCB0IFG &= ~UCRXIFG;
-		if ((*LC + 1) % LOG_MAX != *NC) {
-			*I2NCH = 0;
-			*FLGS |= I2CCSEND;
-			UCB0TXBUF = (unsigned char) (LOG[*LC] >> (*I2NCH * 8));
+		if ((s->lc + 1) % LOG_MAX != s->nc) {
+			s->i2nch = 0;
+			s->flags |= I2CCSEND;
+			UCB0TXBUF = (unsigned char) (s->log[s->lc] >> (s->i2nch * 8));
 		} else {
 			UCB0TXBUF = (unsigned char) 0x00;
 		}
