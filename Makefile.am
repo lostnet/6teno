@@ -1,15 +1,14 @@
+bin_PROGRAMS = teno
 EXTRA_teno_SOURCES = gpiokeys.c gemenipr.c
 
 if GPIO
-	gpio = gpiokeys.o
+ gpio = gpiokeys.c
 else
-	gpio =	
+ gpio =
 endif
 if GEMENI
-	gemeni = gemenipr.o
+ gemeni = gemenipr.c
 else
-	gemeni =	
+ gemeni =
 endif
-teno_LDADD = $(gemeni) $(gpio)
-teno_SOURCES = main.c
-bin_PROGRAMS = teno
+teno_SOURCES = main.c $(gemeni) $(gpio)
