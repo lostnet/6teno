@@ -1,3 +1,4 @@
+#include "config.h"
 #include <msp430fr5739.h>
 
 #define LH 0
@@ -70,4 +71,15 @@ typedef struct StenoFeature StenoFeature;
 #define	I2CCSEND	8
 // define	DEBUG		16
 #define VALID		32 // valid (cache) entry
+
+typedef enum {
+#ifdef HAVE_GPIO
+gpio,
+#endif
+#ifdef HAVE_GEMENI
+gemeni,
+#endif
+end
+} MNUM;
+
 

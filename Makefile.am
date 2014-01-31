@@ -11,7 +11,7 @@ if GEMENI
 else
  gemeni =
 endif
-teno_SOURCES = main.c $(gemeni) $(gpio)
+teno_SOURCES = fwork.c $(gemeni) $(gpio)
 
 install:
 	 $(INSTALL) $(INSTALLARGS) $(DONGLE) "load teno"

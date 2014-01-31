@@ -1,6 +1,6 @@
 #include "fwork.h"
 
-void onSetup(StenoLog *s, StenoStats *st) {
+void GPIO_onSetup(StenoLog *s, StenoStats *st) {
   
   PASEL1 &= (~PADA_M);
   PBSEL1 &= (~PADB_M); // leave the rest
@@ -44,7 +44,7 @@ There are 3 potential groups of pins in a chord:
 	never pressed (pull low, watch all for going high)
 
 */
-int onInterrupt(StenoLog *s, StenoStats *st)
+int GPIO_onInterrupt(StenoLog *s, StenoStats *st)
 {
 
   unsigned long volatile upd = 0;

@@ -25,6 +25,10 @@ AC_ARG_ENABLE(gpio,
 	*) AC_MSG_ERROR([bad value ${enableval} for --enable-gpio]) ;;
 esac],[gpio=true])
 AM_CONDITIONAL(GPIO, [test x$gpio = xtrue])
+if test x$gpio = xtrue
+then
+ AC_DEFINE([HAVE_GPIO], [1], [GPIO keyboard enabled])
+fi
 
 AC_ARG_ENABLE(dongle,
 [ --enable-dongle=name enable name debug dongle],
@@ -43,6 +47,10 @@ AC_ARG_ENABLE(gemeni,
 	*) AC_MSG_ERROR([bad value ${enableval} for --enable-gemeni]) ;;
 esac],[gemeni=false])
 AM_CONDITIONAL(GEMENI, [test x$gemeni = xtrue])
+if test x$gemeni = xtrue
+then
+ AC_DEFINE([HAVE_GEMENI], [1], [GemeniPR protocol enabled])
+fi
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])

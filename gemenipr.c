@@ -1,6 +1,6 @@
 #include "fwork.h"
 
-void onSetup(StenoLog *s, StenoStats *st) {
+void GEMENI_onSetup(StenoLog *s, StenoStats *st) {
 
   // Configure UART pins
   P2SEL1 |= BIT0 + BIT1;
@@ -25,5 +25,5 @@ pragma vector=PORT4_VECTOR
 
 
 */
-int onInterrupt(StenoLog *s, StenoStats *st)
+int GEMENI_onInterrupt(StenoLog *s, StenoStats *st)
 {}
