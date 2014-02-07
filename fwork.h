@@ -1,5 +1,11 @@
 #include "config.h"
 #include <msp430fr5739.h>
+#ifdef HAVE_GPIO
+#include "gpiokeys.h"
+#endif
+#ifdef HAVE_GEMENI
+#include "gemenipr.h"
+#endif
 
 #define LH 0
 #define ALLLH 0
@@ -23,20 +29,30 @@ struct StenoLog {
 	unsigned int lc; // last sent chord
 	unsigned char i2nch; // last sent sub byte
 	unsigned char flags; // log status
-	unsigned char active_flags; // signs of life
 	unsigned char resrv;
 	unsigned int volatile log[LOG_MAX]; // bulk log
 };
 
 typedef struct StenoLog StenoLog;
 
+typedef enum {
+cache,
+#ifdef HAVE_GPIO
+gpio,
+#endif
+#ifdef HAVE_GEMENI
+gemeni,
+#endif
+end
+} MNUM;
+
 struct StenoFeature {
 	unsigned long pins;
 	void (*onSetup)();
-	void (*onFlagsWake)();
-	void (*onInterrupt)();
+	void (*onFlagsWake)(volatile StenoLog*, volatile StenoStats*);
+	int (*onInterrupt)(volatile StenoLog*, volatile StenoStats*);
 	void *ivectors;
-	unsigned char id;
+	MNUM id;
 	unsigned char flags;
 	unsigned char sleep_bits;
 	unsigned char pmm_bits;
@@ -72,14 +88,11 @@ typedef struct StenoFeature StenoFeature;
 // define	DEBUG		16
 #define VALID		32 // valid (cache) entry
 
-typedef enum {
-#ifdef HAVE_GPIO
-gpio,
-#endif
-#ifdef HAVE_GEMENI
-gemeni,
-#endif
-end
-} MNUM;
+// debugging statistics
+extern volatile StenoStats *st; 
 
+// features to implement starting with a cache of the total enabled ones.
+volatile StenoFeature *fcache;
 
+// The raw log
+volatile StenoLog *s;

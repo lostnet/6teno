@@ -1,0 +1,24 @@
+6-Teno
+=====
+
+This is the software component of a Stenography keyboard based on the
+MSP430FR series Microcontroller.
+
+Initially it is intended to:
+- Operate on the MSP430FR5739 (and similar)
+- Implement a direct key-for-key (not grid) keyboard with 23+ GPIO/Keys.
+	(to maximize time in sleep mode waiting for interruptis.)
+- Implement a local circular log in FRAM.
+- Implement the GemeniPR Serial interface.
+- Run in a headless mode from battery for an inordinately long amount of time.
+
+** It does not currently meet these goals. **
+
+Later plans are:
+- Support for more serial output protocols
+- Support for newer MSP430FR chips
+- An i2c+1 GPIO output protocol
+- A hardware dictionary (SPI, I2c?)
+- A hardware display
+
+To follow or replicate hardware development, see http://www.lost.net/6teno

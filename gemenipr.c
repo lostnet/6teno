@@ -1,6 +1,9 @@
 #include "fwork.h"
 
-void GEMENI_onSetup(StenoLog *s, StenoStats *st) {
+#define GEMENIFEATURE (fcache[gemenim])
+MNUM gemenim;
+
+void GEMENI_onSetup(volatile StenoLog *s, volatile StenoStats *st) {
 
   // Configure UART pins
   P2SEL1 |= BIT0 + BIT1;
@@ -25,5 +28,20 @@ pragma vector=PORT4_VECTOR
 
 
 */
-int GEMENI_onInterrupt(StenoLog *s, StenoStats *st)
+int GEMENI_onInterrupt(volatile StenoLog *s, volatile StenoStats *st)
 {}
+
+int GEMENI_onRegister()
+{
+
+  gemenim = gemeni;
+  GEMENIFEATURE.id = gemenim;
+  GEMENIFEATURE.pins = 1;
+  GEMENIFEATURE.onSetup = &GEMENI_onSetup;
+  GEMENIFEATURE.onFlagsWake = (void*)0;
+  GEMENIFEATURE.onInterrupt = *GEMENI_onInterrupt;
+  GEMENIFEATURE.ivectors = (void*)0;
+  GEMENIFEATURE.flags = 0;
+  GEMENIFEATURE.sleep_bits = 0;
+  GEMENIFEATURE.pmm_bits = 0;
+}

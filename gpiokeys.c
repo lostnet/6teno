@@ -1,6 +1,9 @@
 #include "fwork.h"
 
-void GPIO_onSetup(StenoLog *s, StenoStats *st) {
+#define GPIOFEATURE (fcache[gpiom])
+MNUM gpiom;
+
+void GPIO_onSetup(volatile StenoLog *s, volatile StenoStats *st) {
   
   PASEL1 &= (~PADA_M);
   PBSEL1 &= (~PADB_M); // leave the rest
@@ -44,7 +47,7 @@ There are 3 potential groups of pins in a chord:
 	never pressed (pull low, watch all for going high)
 
 */
-int GPIO_onInterrupt(StenoLog *s, StenoStats *st)
+int GPIO_onInterrupt(volatile StenoLog *s, volatile StenoStats *st)
 {
 
   unsigned long volatile upd = 0;
@@ -101,3 +104,15 @@ int GPIO_onInterrupt(StenoLog *s, StenoStats *st)
   return 0;
 }
 
+int GPIO_onRegister() {
+  gpiom = gpio;
+  GPIOFEATURE.id = gpio;
+  GPIOFEATURE.pins = 1;
+  GPIOFEATURE.onSetup = &GPIO_onSetup;
+  GPIOFEATURE.onFlagsWake = (void*)0;
+  GPIOFEATURE.onInterrupt = &GPIO_onInterrupt;
+  GPIOFEATURE.ivectors = (void*)0;
+  GPIOFEATURE.flags = 0;
+  GPIOFEATURE.sleep_bits = 0;
+  GPIOFEATURE.pmm_bits = 0;
+}
