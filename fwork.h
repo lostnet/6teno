@@ -11,6 +11,10 @@
 #define ALLLH 0
 #define ALLLL ~ALLLH
 
+// ACLK 375 HZ
+#define DEBOUNCE 15
+
+
 struct StenoStats {
 	unsigned long volatile mc; // main entrances
 	unsigned long volatile rchrd; // raw chord(s) overlayed
@@ -27,7 +31,7 @@ typedef struct StenoStats StenoStats;
 struct StenoLog {
 	unsigned int nc; // next chord location
 	unsigned int lc; // last sent chord
-	unsigned char i2nch; // last sent sub byte
+	unsigned char nch; // last sent sub byte
 	unsigned char flags; // log status
 	unsigned char resrv;
 	unsigned int volatile log[LOG_MAX]; // bulk log
@@ -49,7 +53,7 @@ end
 struct StenoFeature {
 	unsigned long pins;
 	void (*onSetup)();
-	void (*onFlagsWake)(volatile StenoLog*, volatile StenoStats*);
+	int (*onFlagsWake)(volatile StenoLog*, volatile StenoStats*);
 	int (*onInterrupt)(volatile StenoLog*, volatile StenoStats*);
 	void *ivectors;
 	MNUM id;
@@ -84,7 +88,8 @@ typedef struct StenoFeature StenoFeature;
 #define	CHREADY		1
 #define	STRT		2
 #define	R2NOTIFY	4
-#define	I2CCSEND	8
+#define	CSEND		8
+#define	CPUWAKE		16
 // define	DEBUG		16
 #define VALID		32 // valid (cache) entry
 

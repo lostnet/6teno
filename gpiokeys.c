@@ -52,8 +52,6 @@ int GPIO_onInterrupt(volatile StenoLog *s, volatile StenoStats *st)
 
   unsigned long volatile upd = 0;
 
-  if (!(PAIFG & PADA_M || PBIFG & PADB_M))
-	return 0;
 
   upd = (PAIN & PADA_M);
   upd = upd<<16;
@@ -77,11 +75,13 @@ int GPIO_onInterrupt(volatile StenoLog *s, volatile StenoStats *st)
   PAIFG &= ~PADA_M; // clear flags
   PBIFG &= ~PADB_M;
 
+  TA0CTL |= TACLR;	// reset debounce time	
 
   if (upd == 0) {
 	if(s->log[s->nc] != 0) {
     		s->nc += 1;
     		s->flags |= CHREADY;
+
     		return 1;
 	}
   } else {
@@ -104,15 +104,33 @@ int GPIO_onInterrupt(volatile StenoLog *s, volatile StenoStats *st)
   return 0;
 }
 
+int GPIO_onFlagsWake(volatile StenoLog *s, volatile StenoStats *st) {
+  	TA0CCR0 = DEBOUNCE; // reset bounce wait on any key event
+	TA0CTL = TASSEL_1 + MC_1 + TAIE;	
+
+}
+
+#pragma vector=TIMER0_A0_VECTOR
+__interrupt void GPIO_Timer(void) {
+	if (s->flags & CHREADY) {
+		s->flags &= ~CHREADY;
+		s->nc = (s->nc+1) % LOG_MAX;
+		s->log[s->nc] = 0;
+		s->flags |= R2NOTIFY;
+	}
+	TA0CTL = 0;
+}
+
 int GPIO_onRegister() {
   gpiom = gpio;
   GPIOFEATURE.id = gpio;
-  GPIOFEATURE.pins = 1;
+  GPIOFEATURE.pins = PADA_M;
+  GPIOFEATURE.pins = (GPIOFEATURE.pins << 16) | PADB_M;
   GPIOFEATURE.onSetup = &GPIO_onSetup;
-  GPIOFEATURE.onFlagsWake = (void*)0;
+  GPIOFEATURE.onFlagsWake = &GPIO_onFlagsWake;
   GPIOFEATURE.onInterrupt = &GPIO_onInterrupt;
   GPIOFEATURE.ivectors = (void*)0;
-  GPIOFEATURE.flags = 0;
+  GPIOFEATURE.flags = CHREADY;
   GPIOFEATURE.sleep_bits = 0;
   GPIOFEATURE.pmm_bits = 0;
 }

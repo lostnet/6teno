@@ -36,7 +36,7 @@ void setp() {
 	}
 	if ((s->lc >= LOG_MAX) || (s->lc == s->nc)) {
 		s->lc = s->nc ? s->nc-1:LOG_MAX-1;
-		s->i2nch = 0;
+		s->nch = 0;
 	}
 
 	st->mc = 1;
@@ -63,28 +63,30 @@ int main(void) {
 	CSCTL0_H = 0x01; // Close access
 
 
-	if ((s->flags & fcache[0].flags) == 0) {
+	if ((s->flags & CPUWAKE) == 0) {
 		setp();
-	} else {
+	}
+	s->flags &= ~CPUWAKE;
+	do {
 		for (i = end-1; i>0; i--) {
 			if (s->flags | fcache[i].flags)
 				fcache[i].onFlagsWake(s, st);
 		}
-	}
-	// ? __enable_interrupt();
-	while (1) {
-		__delay_cycles(20000); // 20 MS?
-		if (!(s->flags & DEBUG)) {
-			slp();
-			st->wk = 0xedfecefa;
-		}
-	}
+		__delay_cycles(2000); // 2 MS?
+	} while (s->flags);
+
+	slp();
+	st->wk = 0xedfecefa;
 	return 1;
 }
 
 
 static inline unsigned long findpins() {
-	return 0;
+	unsigned long repins;
+
+	repins = (PAIFG << 16 + PBIFG);
+	
+	return repins;
 }
 
 #pragma vector=PORT1_VECTOR
@@ -97,13 +99,19 @@ static inline unsigned long findpins() {
 #pragma vector=DMA_VECTOR
 __interrupt void onInterrupt() {
 	int i;
-
+	int flags = s->flags;
 	unsigned long pins = findpins();
+
+
 	if (!(pins | fcache[0].pins))
 		return;
 	for (i = end-1; i>0; i--) {
 		if (pins | fcache[i].pins)
 			fcache[i].onInterrupt(s, st);
+	}
+	if (flags != s->flags) {
+		s->flags |= CPUWAKE;
+		__bic_SR_register_on_exit(fcache[0].pmm_bits);
 	}
 	return;
 }
